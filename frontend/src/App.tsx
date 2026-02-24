@@ -72,46 +72,71 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 400 }}>
-      <h1 style={{ marginTop: 0 }}>Tic-Tac-Toe</h1>
-
-      <p>
-        Status: <strong>{connectionStatus}</strong>
-      </p>
+    <div
+      style={{
+        padding: "clamp(16px, 4vw, 24px)",
+        width: "100%",
+        maxWidth: "min(400px, 95vw)",
+      }}
+    >
+      <h1 style={{ marginTop: 0, fontSize: "clamp(1.5rem, 5vw, 2rem)", textAlign: "center" }}>
+        Tic-Tac-Toe
+      </h1>
 
       {connectionStatus === "disconnected" && (
-        <button type="button" onClick={connect}>
-          Connect
-        </button>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 24 }}>
+          <button
+            type="button"
+            onClick={connect}
+            style={{ padding: "12px 24px", fontSize: "1.125rem" }}
+          >
+            Connect
+          </button>
+        </div>
       )}
       {connectionStatus === "connected" && !gameState && (
-        <>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <button type="button" onClick={handleJoin}>
             Join game
           </button>
-          <button type="button" onClick={disconnect} style={{ marginLeft: 8 }}>
+          <button type="button" onClick={disconnect}>
             Disconnect
           </button>
-        </>
+        </div>
       )}
 
       {gameState && (
         <>
-          <p>
-            {gameState.status === "waiting" && "Waiting for opponent..."}
-            {gameState.status === "in_progress" && `Turn: ${gameState.current_turn}`}
-            {gameState.status === "finished" &&
-              (gameState.winner
-                ? `Winner: ${gameState.winner}`
-                : "Draw")}
-          </p>
-          {playerSymbol && <p>You are: {playerSymbol}</p>}
+          <div className="game-info">
+            <p>
+              {gameState.status === "waiting" && "Waiting for opponent..."}
+              {gameState.status === "in_progress" && (
+                <>
+                  Turn: <span className={gameState.current_turn === "X" ? "cell-x" : "cell-o"}>{gameState.current_turn}</span>
+                </>
+              )}
+              {gameState.status === "finished" &&
+                (gameState.winner ? (
+                  <>
+                    Winner: <span className={gameState.winner === "X" ? "cell-x" : "cell-o"}>{gameState.winner}</span>
+                  </>
+                ) : (
+                  "Draw"
+                ))}
+            </p>
+            {playerSymbol && (
+              <p>
+                You are: <span className={playerSymbol === "X" ? "cell-x" : "cell-o"}>{playerSymbol}</span>
+              </p>
+            )}
+          </div>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 4,
-              width: "min(280px, 100%)",
+              gap: "clamp(4px, 1.5vw, 12px)",
+              width: "min(280px, 85vw, 100%)",
+              maxWidth: "100%",
             }}
           >
             {gameState.board.map((cell, i) => (
@@ -124,9 +149,11 @@ export default function App() {
                   gameState.current_turn !== playerSymbol
                 }
                 onClick={() => handleMove(i)}
+                className={cell === "X" ? "cell-x" : cell === "O" ? "cell-o" : undefined}
                 style={{
                   aspectRatio: "1",
-                  fontSize: 24,
+                  fontSize: "clamp(1.25rem, 6vw, 2rem)",
+                  minHeight: 44,
                   cursor: cell === null && gameState.status === "in_progress" ? "pointer" : "default",
                 }}
               >
@@ -134,14 +161,14 @@ export default function App() {
               </button>
             ))}
           </div>
-          <button type="button" onClick={disconnect} style={{ marginTop: 16 }}>
+          <button type="button" onClick={disconnect} style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
             Leave / Disconnect
           </button>
         </>
       )}
 
       {errorMessage && (
-        <p style={{ color: "crimson", marginTop: 16 }}>{errorMessage}</p>
+        <p style={{ color: "#f87171", marginTop: 16 }}>{errorMessage}</p>
       )}
     </div>
   );

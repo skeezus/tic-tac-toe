@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    volumes:
+      # Mount app code so uvicorn --reload picks up local changes
+      - ./backend/app:/app/app
+    command: ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
 
   frontend:
     build:
@@ -14,5 +18,12 @@ services:
       - "5173:5173"
     environment:
       BACKEND_URL: http://backend:8000
+    volumes:
+      # Mount source so Vite HMR picks up local changes; node_modules stays from image
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
     depends_on:
       - backend
