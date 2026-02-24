@@ -10,12 +10,15 @@ This Terraform config builds the backend and frontend containers, pushes them to
 
 ## Setup
 
-1. Authenticate and set project:
+1. Authenticate and set project (required for Terraform **and** for `gcloud builds submit`):
 
    ```bash
+   gcloud auth login
    gcloud auth application-default login
    gcloud config set project YOUR_PROJECT_ID
    ```
+
+   If you see `invalid_grant` or "problem refreshing your current auth tokens" during apply, re-run the two `gcloud auth` commands above and try again.
 
 2. From the **repository root** (not inside `terraform/`), run:
 

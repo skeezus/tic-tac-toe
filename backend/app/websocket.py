@@ -11,7 +11,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.game_logic import apply_move
 from app.game_store import (
     get_game_for_connection,
-    get_the_game,
     join_or_create,
     remove_connection,
 )
@@ -48,7 +47,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     "player_symbol": game.players[connection_id],
                     "game_state": game.to_state(),
                 })
-                await _broadcast_game(exclude=connection_id)
+                await _broadcast_game(game, exclude=connection_id)
             elif msg_type == "move":
                 cell = msg.get("cell")
                 if cell is None:
@@ -73,7 +72,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     game.status = "finished"
                 else:
                     game.current_turn = "O" if game.current_turn == "X" else "X"
-                await _broadcast_game()
+                await _broadcast_game(game)
             else:
                 await websocket.send_json({"type": "error", "message": "Unknown message type"})
     except WebSocketDisconnect:
@@ -82,12 +81,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         del connections[connection_id]
         game = remove_connection(connection_id)
         if game:
-            await _broadcast_game()
+            await _broadcast_game(game)
 
 
-async def _broadcast_game(exclude: str | None = None) -> None:
-    """Send current game state to all connections in the game."""
-    game = get_the_game()
+async def _broadcast_game(game, exclude: str | None = None) -> None:
+    """Send current game state to all connections in this game."""
     if not game:
         return
     payload = {"type": "game_state", "game_state": game.to_state()}

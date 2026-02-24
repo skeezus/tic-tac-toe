@@ -54,7 +54,7 @@ resource "google_artifact_registry_repository_iam_member" "cloudbuild_writer" {
 resource "null_resource" "backend_build" {
   triggers = {
     dockerfile = md5(file("${local.backend_dir}/Dockerfile"))
-    app        = md5(join("", [for f in fileset("${local.backend_dir}/app", "**") : file("${local.backend_dir}/app/${f}")]))
+    app        = md5(join("", [for f in fileset("${local.backend_dir}/app", "**") : filemd5("${local.backend_dir}/app/${f}")]))
   }
 
   provisioner "local-exec" {
@@ -72,7 +72,7 @@ resource "null_resource" "backend_build" {
 resource "null_resource" "frontend_build" {
   triggers = {
     dockerfile = md5(file("${local.frontend_dir}/Dockerfile.prod"))
-    app        = md5(join("", [for f in fileset("${local.frontend_dir}/src", "**") : file("${local.frontend_dir}/src/${f}")]))
+    app        = md5(join("", [for f in fileset("${local.frontend_dir}/src", "**") : filemd5("${local.frontend_dir}/src/${f}")]))
   }
 
   provisioner "local-exec" {
@@ -86,13 +86,18 @@ resource "null_resource" "frontend_build" {
   ]
 }
 
-# Backend Cloud Run service
+# Backend Cloud Run service (WebSockets, game state; min 1 = no cold starts)
 resource "google_cloud_run_v2_service" "backend" {
   name     = "tic-tac-toe-backend"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 1
+    }
+
     containers {
       image = local.backend_image
 
@@ -103,8 +108,9 @@ resource "google_cloud_run_v2_service" "backend" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "512Mi"
+          memory = "1Gi"
         }
+        cpu_idle = false
       }
     }
   }
@@ -115,13 +121,18 @@ resource "google_cloud_run_v2_service" "backend" {
   ]
 }
 
-# Frontend Cloud Run service (needs BACKEND_URL from backend service)
+# Frontend Cloud Run service (static + config; min 1 = no cold starts)
 resource "google_cloud_run_v2_service" "frontend" {
   name     = "tic-tac-toe-frontend"
   location = var.region
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 1
+    }
+
     containers {
       image = local.frontend_image
 
@@ -137,8 +148,9 @@ resource "google_cloud_run_v2_service" "frontend" {
       resources {
         limits = {
           cpu    = "1"
-          memory = "256Mi"
+          memory = "512Mi"
         }
+        cpu_idle = false
       }
     }
   }
