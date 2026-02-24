@@ -1,0 +1,13 @@
+# Cloud Build config for production frontend (uses Dockerfile.prod).
+# Invoked by Terraform with: --substitutions=_IMAGE=<artifact-registry-url>
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_IMAGE}"
+      - "-f"
+      - "Dockerfile.prod"
+      - "."
+images:
+  - "${_IMAGE}"

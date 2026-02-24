@@ -63,6 +63,14 @@ yarn-error.log*
 pnpm-debug.log*
 
 # -----------------------------------------------------------------------------
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+
 # IDE / OS
 # -----------------------------------------------------------------------------
 .idea/

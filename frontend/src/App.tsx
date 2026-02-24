@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { getWebSocketUrl } from "./config";
 
 type GameState = {
-  game_id: string;
   board: (string | null)[];
   current_turn: "X" | "O";
   status: "waiting" | "in_progress" | "finished";
@@ -16,14 +16,12 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [playerSymbol, setPlayerSymbol] = useState<"X" | "O" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [joinGameId, setJoinGameId] = useState("");
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   const connect = () => {
     setErrorMessage(null);
     setConnectionStatus("connecting");
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const socket = new WebSocket(getWebSocketUrl());
     socket.onopen = () => {
       setConnectionStatus("connected");
       setWs(socket);
@@ -37,7 +35,7 @@ export default function App() {
     socket.onerror = () => setConnectionStatus("disconnected");
     socket.onmessage = (event) => {
       const msg = JSON.parse(event.data);
-      if (msg.type === "game_created" || msg.type === "game_joined") {
+      if (msg.type === "game_joined") {
         setGameState(msg.game_state);
         setPlayerSymbol(msg.player_symbol);
         setErrorMessage(null);
@@ -64,18 +62,13 @@ export default function App() {
     }
   };
 
-  const handleCreateGame = () => {
-    send({ type: "create" });
-  };
-
-  const handleJoinGame = () => {
-    if (!joinGameId.trim()) return;
-    send({ type: "join", game_id: joinGameId.trim() });
+  const handleJoin = () => {
+    send({ type: "join" });
   };
 
   const handleMove = (cell: number) => {
-    if (!gameState?.game_id) return;
-    send({ type: "move", game_id: gameState.game_id, cell });
+    if (!gameState) return;
+    send({ type: "move", cell });
   };
 
   return (
@@ -93,20 +86,9 @@ export default function App() {
       )}
       {connectionStatus === "connected" && !gameState && (
         <>
-          <button type="button" onClick={handleCreateGame}>
-            Create game
+          <button type="button" onClick={handleJoin}>
+            Join game
           </button>
-          <div style={{ marginTop: 8 }}>
-            <input
-              type="text"
-              placeholder="Game ID to join"
-              value={joinGameId}
-              onChange={(e) => setJoinGameId(e.target.value)}
-            />
-            <button type="button" onClick={handleJoinGame} style={{ marginLeft: 8 }}>
-              Join game
-            </button>
-          </div>
           <button type="button" onClick={disconnect} style={{ marginLeft: 8 }}>
             Disconnect
           </button>

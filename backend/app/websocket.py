@@ -1,5 +1,5 @@
 """
-WebSocket endpoint: connect, create/join game, move, broadcast.
+WebSocket endpoint: connect, join (single game), move, broadcast.
 """
 from __future__ import annotations
 
@@ -9,7 +9,12 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.game_logic import apply_move
-from app.game_store import create_game, get_game, join_game, remove_connection
+from app.game_store import (
+    get_game_for_connection,
+    get_the_game,
+    join_or_create,
+    remove_connection,
+)
 
 router = APIRouter()
 
@@ -33,43 +38,25 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 continue
 
             msg_type = msg.get("type")
-            if msg_type == "create":
-                game = create_game(connection_id)
-                await websocket.send_json({
-                    "type": "game_created",
-                    "game_id": game.game_id,
-                    "player_symbol": "X",
-                    "game_state": game.to_state(),
-                })
-            elif msg_type == "join":
-                game_id = msg.get("game_id")
-                if not game_id:
-                    await websocket.send_json({"type": "error", "message": "Missing game_id"})
-                    continue
-                err = join_game(game_id, connection_id)
+            if msg_type == "join":
+                game, err = join_or_create(connection_id)
                 if err:
                     await websocket.send_json({"type": "error", "message": err})
                     continue
-                game = get_game(game_id)
                 await websocket.send_json({
                     "type": "game_joined",
-                    "game_id": game_id,
-                    "player_symbol": "O",
+                    "player_symbol": game.players[connection_id],
                     "game_state": game.to_state(),
                 })
-                await _broadcast_game(game_id, exclude=connection_id)
+                await _broadcast_game(exclude=connection_id)
             elif msg_type == "move":
-                game_id = msg.get("game_id")
                 cell = msg.get("cell")
-                if game_id is None or cell is None:
-                    await websocket.send_json({"type": "error", "message": "Missing game_id or cell"})
+                if cell is None:
+                    await websocket.send_json({"type": "error", "message": "Missing cell"})
                     continue
-                game = get_game(game_id)
+                game = get_game_for_connection(connection_id)
                 if not game:
-                    await websocket.send_json({"type": "error", "message": "Game not found"})
-                    continue
-                if connection_id not in game.players:
-                    await websocket.send_json({"type": "error", "message": "Not in this game"})
+                    await websocket.send_json({"type": "error", "message": "Not in game"})
                     continue
                 symbol = game.players[connection_id]
                 ok, err, new_board, winner, is_draw = apply_move(
@@ -86,22 +73,21 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     game.status = "finished"
                 else:
                     game.current_turn = "O" if game.current_turn == "X" else "X"
-                await _broadcast_game(game_id)
+                await _broadcast_game()
             else:
                 await websocket.send_json({"type": "error", "message": "Unknown message type"})
     except WebSocketDisconnect:
         pass
     finally:
         del connections[connection_id]
-        for game in remove_connection(connection_id):
-            game.status = "finished"
-            game.winner = None
-            await _broadcast_game(game.game_id)
+        game = remove_connection(connection_id)
+        if game:
+            await _broadcast_game()
 
 
-async def _broadcast_game(game_id: str, exclude: str | None = None) -> None:
-    """Send current game state to all connections in this game."""
-    game = get_game(game_id)
+async def _broadcast_game(exclude: str | None = None) -> None:
+    """Send current game state to all connections in the game."""
+    game = get_the_game()
     if not game:
         return
     payload = {"type": "game_state", "game_state": game.to_state()}

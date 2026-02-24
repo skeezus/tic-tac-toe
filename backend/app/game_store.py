@@ -1,12 +1,11 @@
 """
-In-memory game store. One game per game_id; connection_id -> symbol mapping per game.
+In-memory single-game store. Two players; third gets "Game is full".
 """
 from __future__ import annotations
 
-import uuid
 from typing import Optional
 
-from app.models import Board, Symbol, Status, WINNING_COMBOS
+from app.models import Board, Symbol, Status
 
 
 def _empty_board() -> Board:
@@ -17,7 +16,6 @@ class Game:
     """Single game state."""
 
     def __init__(self) -> None:
-        self.game_id = str(uuid.uuid4())
         self.board: Board = _empty_board()
         self.current_turn: Symbol = "X"
         self.status: Status = "waiting"
@@ -27,7 +25,6 @@ class Game:
     def to_state(self) -> dict:
         """Serialize for broadcast (no connection IDs)."""
         return {
-            "game_id": self.game_id,
             "board": self.board,
             "current_turn": self.current_turn,
             "status": self.status,
@@ -36,43 +33,49 @@ class Game:
         }
 
 
-_store: dict[str, Game] = {}  # game_id -> Game
+_game: Optional[Game] = None
 
 
-def create_game(connection_id: str) -> Game:
-    """Create a new game; first connection is X."""
-    game = Game()
-    game.players[connection_id] = "X"
-    _store[game.game_id] = game
-    return game
-
-
-def get_game(game_id: str) -> Optional[Game]:
-    return _store.get(game_id)
-
-
-def join_game(game_id: str, connection_id: str) -> Optional[str]:
+def join_or_create(connection_id: str) -> tuple[Optional[Game], Optional[str]]:
     """
-    Join existing game. Returns error message or None on success.
-    Assigns O to second player and sets status to in_progress.
+    Join the single game. Returns (game, None) on success or (None, error_message).
+    If no game or game is finished, start a new game and add connection as X.
+    If game has one player, add as O. If game has two players, return "Game is full".
     """
-    game = _store.get(game_id)
-    if not game:
-        return "Game not found"
-    if len(game.players) >= 2:
-        return "Game is full"
-    if connection_id in game.players:
-        return "Already in this game"
-    game.players[connection_id] = "O"
-    game.status = "in_progress"
+    global _game
+    if _game is None or _game.status == "finished":
+        _game = Game()
+        _game.players[connection_id] = "X"
+        return _game, None
+    if len(_game.players) >= 2:
+        return None, "Game is full"
+    if connection_id in _game.players:
+        return _game, None  # already in game (reconnect?)
+    _game.players[connection_id] = "O"
+    _game.status = "in_progress"
+    return _game, None
+
+
+def get_game_for_connection(connection_id: str) -> Optional[Game]:
+    """Return the (single) game this connection is in, or None."""
+    if _game is None:
+        return None
+    if connection_id in _game.players:
+        return _game
     return None
 
 
-def remove_connection(connection_id: str) -> list[Game]:
-    """Remove player from any game; return affected games (e.g. to end/broadcast)."""
-    affected = []
-    for game in list(_store.values()):
-        if connection_id in game.players:
-            del game.players[connection_id]
-            affected.append(game)
-    return affected
+def get_the_game() -> Optional[Game]:
+    """Return the single game, if any."""
+    return _game
+
+
+def remove_connection(connection_id: str) -> Optional[Game]:
+    """Remove player from the game; return the game if it was affected."""
+    global _game
+    if _game is None or connection_id not in _game.players:
+        return None
+    del _game.players[connection_id]
+    _game.status = "finished"
+    _game.winner = None
+    return _game
