@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "tic-tac-toe-backend"
+version = "0.1.0"
+description = "Multiplayer Tic-Tac-Toe over WebSockets"
+authors = ["Tic-Tac-Toe Team"]
+readme = "README.md"
+packages = [{ include = "app", from = "." }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.115.6"
+uvicorn = { extras = ["standard"], version = "0.32.1" }
+websockets = "14.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
